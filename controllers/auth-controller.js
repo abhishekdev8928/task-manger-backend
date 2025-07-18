@@ -1,51 +1,50 @@
-const User = require("../models/user-model");
-const crypto = require('crypto'); // for generating tokens
+const crypto = require('crypto');
 const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const speakeasy = require("speakeasy");
+const { Employee } = require("../models/employee-model"); // ✅ Destructured properly
 
-const home = async (req,res)=>{
-    try {
-        res
-        .status(200)
-        .send("Welcome to mernstack using new router controller ");
-
-    } catch (error) {
-        console.log(error);
-    }
+const home = async (req, res) => {
+  try {
+    res.status(200).send("Welcome to mernstack using new router controller ");
+  } catch (error) {
+    console.log(error);
+  }
 };
 
-const register = async (req,res)=>{
-    try {
-       
-        const { username, email, phone, password } = req.body;
-  
-        const userExist = await User.findOne({ email });
-        
-        if(userExist){
-            return res.status(400).json({msg:"Email already exist"});
+const register = async (req, res) => {
+  try {
+    const { username, email, phone, password } = req.body;
 
-        }
-
-        // const saltRound = 10;
-        // const hash_password = await bcrypt.hash(password, saltRound);
-        const userCreated =  await User.create( { username, email, phone, password } );
-        res.status(201).json({
-            msg:userCreated,
-            token: await userCreated.generateToken(),
-             userId:userCreated._id.toString(),
-        });
-
-    } catch (error) {
-     res.status(500).json(error);
+    const userExist = await Employee.findOne({ email });
+    if (userExist) {
+      return res.status(400).json({ msg: "Email already exists" });
     }
+
+    const userCreated = await Employee.create({
+      name: username,
+      email,
+      phone,
+      password,
+      role: 'user', // default role if needed
+    });
+
+    res.status(201).json({
+      msg: userCreated,
+      token: await userCreated.generateToken(),
+      userId: userCreated._id.toString(),
+    });
+
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const userExist = await User.findOne({ email });
+    const userExist = await Employee.findOne({ email });
     if (!userExist) {
       return res.status(400).json({ message: "Email does not exist" });
     }
@@ -55,29 +54,17 @@ const login = async (req, res) => {
       return res.status(401).json({ extraDetails: "Invalid password" });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000);
-    await User.updateOne(
-      { email },
-      {
-        $set: {
-          otp: otp,
-          loginotpcount: 1,
-        },
-      }
-    );
-
-    const token = await userExist.generateToken(); // ✅ await the token properly
+    const token = await userExist.generateToken();
 
     res.status(200).json({
       success: true,
       msg: "Login successful",
-      token, // ✅ REQUIRED by frontend
+      token,
       email,
       user: {
         id: userExist._id,
-        username: userExist.username,
+        role: userExist.role,
         email: userExist.email,
-      
       },
     });
   } catch (error) {
@@ -86,101 +73,72 @@ const login = async (req, res) => {
   }
 };
 
-//otp logic
 const authverify = async (req, res) => {
-    try {
-        const { email, otp } = req.body;
-    
-        // Check if user exists
-        const userExist = await User.findOne({ email });
-        if (!userExist) {
-            return res.status(400).json({ message: "User does not exist." });
-        }
+  try {
+    const { email, otp } = req.body;
 
-        // Validate OTP length
-        if (!otp) {
-            return res.status(400).json({ message: "OTP must be 6 digits." });
-        }
-
-        // Check for secret in authkey
-        const authkey = userExist.authkey;
-
-        if (!authkey) {
-            return res.status(400).json({ message: "Auth key or secret is missing." });
-        }
-        const { secret } = authkey;
-
-        // Verify OTP using speakeasy
-        const validated = speakeasy.totp.verify({
-            secret: userExist.authkey,
-            encoding: 'base32',
-            token: otp, // Replace with the OTP entered by the user
-            window: 1, // Allow for time drift
-        });
-        const token = await userExist.generateToken();
-        if (!validated) {
-            res.status(200).json({
-                msg: 'Invalid OTP',
-              
-            });
-        }else{
-            res.status(200).json({
-                msg: validated,
-                token:token,
-            });
-        }
-        
-
-        // Generate and return token if OTP is valid
-       
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Internal Server Error", error });
+    const userExist = await Employee.findOne({ email });
+    if (!userExist) {
+      return res.status(400).json({ message: "User does not exist." });
     }
+
+    if (!otp) {
+      return res.status(400).json({ message: "OTP must be 6 digits." });
+    }
+
+    const validated = speakeasy.totp.verify({
+      secret: userExist.authkey, // using authkey as base32
+      encoding: 'base32',
+      token: otp,
+      window: 1,
+    });
+
+    const token = await userExist.generateToken();
+    if (!validated) {
+      res.status(200).json({ msg: 'Invalid OTP' });
+    } else {
+      res.status(200).json({ msg: validated, token });
+    }
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
 };
 
+const resendverify = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const userExist = await Employee.findOne({ email });
 
-//resend otp 
-
-const resendverify = async (req,res)=>{
-    try {
-        const {email} = req.body;
-        const userExist = await User.findOne({email});
-        console.log(userExist);
-        if(!userExist){
-            return res.status(400).json({message:"User not exist"});
-        }
-
-        if(userExist.loginotpcount != 4){
-            const rand = Math.floor(100000 + Math.random() * 900000);
-            const result = await User.updateOne({email},{
-                $set:{
-                    otp:rand,
-                    loginotpcount: userExist.loginotpcount + 1,
-                }
-            },{
-                new:true,
-            });
-
-            res.status(200).json({
-                msg:"Otp Sent Successfully",
-                userId:userExist._id.toString(),
-            });
-        }else{
-            res.status(401).json({message:"Limit exceeded Try after Some time"});
-        }
-  
-    } catch (error) {
-     res.status(500).json(error);
+    if (!userExist) {
+      return res.status(400).json({ message: "User not exist" });
     }
+
+    if (userExist.loginotpcount != 4) {
+      const rand = Math.floor(100000 + Math.random() * 900000);
+      await Employee.updateOne({ email }, {
+        $set: {
+          otp: rand,
+          loginotpcount: (userExist.loginotpcount || 0) + 1,
+        }
+      });
+
+      res.status(200).json({
+        msg: "OTP Sent Successfully",
+        userId: userExist._id.toString(),
+      });
+    } else {
+      res.status(401).json({ message: "Limit exceeded. Try after some time" });
+    }
+
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
-//forgot email verify
+
 const logout = async (req, res) => {
   try {
-    // Optional: clear cookies if you're using any (like JWT in cookies)
-    // res.clearCookie("token");
-
-    // Just send a success message — most logout logic is on the frontend
     res.status(200).json({
       success: true,
       message: "User logged out successfully"
@@ -195,118 +153,119 @@ const logout = async (req, res) => {
 };
 
 const forgot = async (req, res) => {
-    try {
-        const { email } = req.body;
-        const userExist = await User.findOne({ email });
+  try {
+    const { email } = req.body;
+    const userExist = await Employee.findOne({ email });
 
-        if (!userExist) {
-            return res.status(401).json({ message: "User does not exist" });
-        }
-
-        // Create nodemailer transporter
-        const transporter = nodemailer.createTransport({
-            host: "smtp.gmail.com",
-            port: 587,
-             secure: false, // Use `true` for port 465, `false` for all other ports
-            auth: {
-                user: "digihost2021@gmail.com",
-                pass: "lvrncususaqdsopy",
-            },
-        });
-
-        // Generate a token and expiration time
-        const token = crypto.randomBytes(32).toString("hex");
-        const tokenExpire = Date.now() + 3600000; // Token expires in 1 hour
-
-        // Save token and expiration to user in the database
-        userExist.resetToken = token;
-        userExist.tokenExpire = tokenExpire;
-        await userExist.save();
-
-        // Construct reset link
-        const resetLink = `http://localhost:3000/auth/resetpassword/${token}`;
-
-        // Send email
-        await transporter.sendMail({
-            from: '"DigiHost 👻" <digihost2021@gmail.com>', // sender address
-            to: email, // recipient's email
-            subject: "Password Reset Request",
-            text: `You requested a password reset. Please click the link to reset your password: ${resetLink}`,
-        });
-
-        res.status(200).json({
-            message: "Email sent successfully. Please check your email to reset your password.",
-        });
-    } catch (error) {
-        console.error("Error in forgot password function:", error);
-        res.status(500).json({ message: "An error occurred while processing the request." });
+    if (!userExist) {
+      return res.status(401).json({ message: "User does not exist" });
     }
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: "digihost2021@gmail.com",
+        pass: "lvrncususaqdsopy",
+      },
+    });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const tokenExpire = new Date(Date.now() + 3600000);
+
+    userExist.resetToken = token;
+    userExist.tokenExpire = tokenExpire;
+    await userExist.save();
+
+    const resetLink = `http://localhost:3000/auth/resetpassword/${token}`;
+
+    await transporter.sendMail({
+      from: '"DigiHost 👻" <digihost2021@gmail.com>',
+      to: email,
+      subject: "Password Reset Request",
+      text: `Click the link to reset your password: ${resetLink}`,
+    });
+
+    res.status(200).json({
+      message: "Email sent successfully. Please check your inbox.",
+    });
+  } catch (error) {
+    console.error("Error in forgot password function:", error);
+    res.status(500).json({ message: "An error occurred while processing the request." });
+  }
 };
 
-// reset password
+const resetpassword = async (req, res) => {
+  try {
+    const { email, password, cpassword } = req.body;
+    const userExist = await Employee.findOne({ email });
 
-const resetpassword = async (req,res)=>{
-    try {
-        const {email, password, cpassword} = req.body;
-        const userExist = await User.findOne({email});
-        console.log(userExist);
-        if(!userExist){
-            return res.status(400).json({message:"User not exist"});
-        }else{
-            if(password == cpassword){
-                const saltRound = 10;
-                const hash_password = await bcrypt.hash(cpassword, saltRound);
-                const result = await User.updateOne({email},{
-                    $set:{
-                        password: hash_password,
-                    }
-                },{
-                    new:true,
-                });
-
-                res.status(200).json({
-                    msg:"Password Changed Successfully",
-                    userId:userExist._id.toString(),
-                });
-            }else{
-                return res.status(401).json({message:"Password and Confirm password is not matching"});
-            }
-       
-        }
-  
-    } catch (error) {
-     res.status(500).json(error);
+    if (!userExist) {
+      return res.status(400).json({ message: "User does not exist" });
     }
+
+    if (password !== cpassword) {
+      return res.status(401).json({ message: "Password and Confirm password do not match" });
+    }
+
+    const saltRound = 10;
+    const hash_password = await bcrypt.hash(cpassword, saltRound);
+
+    await Employee.updateOne({ email }, {
+      $set: { password: hash_password }
+    });
+
+    res.status(200).json({
+      msg: "Password Changed Successfully",
+      userId: userExist._id.toString(),
+    });
+
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
-// user logic
-const user = async(req, res) =>{
-   try {
-     const userData = req.user;
-    //  console,log(userData)
-    res.status(200).json({userData});
-   } catch (error) {
+
+const user = async (req, res) => {
+  try {
+    const userData = req.user;
+    res.status(200).json({ userData });
+  } catch (error) {
     console.log(`error from the user route ${error}`);
-   }
-}
+  }
+};
 
 const verifyResetToken = async (req, res) => {
+  try {
     const { token } = req.body;
-   
-    const user = await User.findOne({
-        resetToken: token,
-        tokenExpire: { $gt: Date.now() }, // Ensure token is not expired
+
+    const user = await Employee.findOne({
+      resetToken: token,
+      tokenExpire: { $gt: Date.now() },
     });
 
     if (!user) {
-        return res.status(400).json({ valid: false });
+      return res.status(400).json({ valid: false });
     }
 
-    return  res.status(200).json({
-        valid:true,
-        email:user.email,
+    res.status(200).json({
+      valid: true,
+      email: user.email,
     });
-   
+  } catch (error) {
+    res.status(500).json({ message: "Token validation error", error });
+  }
 };
 
-
-module.exports = { home, register, login, user , authverify, resendverify, forgot, resetpassword, verifyResetToken,logout};
+module.exports = {
+  home,
+  register,
+  login,
+  user,
+  authverify,
+  resendverify,
+  forgot,
+  resetpassword,
+  verifyResetToken,
+  logout
+};

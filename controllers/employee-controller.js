@@ -62,8 +62,9 @@ const formatDateDMY = (date) => {
 const addemployee = async (req, res) => {
   try {
     console.log(req.body);
-    const { name, email, role, createdBy } = req.body;
+    const { emp_id,name, email, role,createdBy } = req.body;
     const status = "1";
+     const password = "Admin@123";
     const url = createCleanUrl(req.body.name);
     const userExist = await Employee.findOne({ email });
     const now = new Date(); // ✅ Define now
@@ -74,6 +75,7 @@ const addemployee = async (req, res) => {
     }
 
     const cmCreated = await Employee.create({
+      emp_id,
       email,
       name,
       role,
@@ -82,6 +84,8 @@ const addemployee = async (req, res) => {
       updatedAt,
       status,
       url,
+      password,
+      
     });
     res.status(201).json({
       msg: cmCreated,
@@ -125,7 +129,7 @@ const updateemployee = async (req, res) => {
     const now = new Date(); // ✅ Define now
     const createdAt = formatDateDMY(now); // 👈 formatted date
     const updatedAt = formatDateDMY(now);
-    const { name, email, role } = req.body;
+    const { emp_id,name, email, role } = req.body;
     const url = createCleanUrl(req.body.name);
     const id = req.params.id;
 
@@ -138,6 +142,7 @@ const updateemployee = async (req, res) => {
       { _id: id },
       {
         $set: {
+          emp_id:emp_id,
           name: name,
           email: email,
           url: url,
@@ -209,6 +214,20 @@ const getemployeeByid = async (req, res) => {
   }
 };
 
+
+const generateEmployeeCode = async (req, res) => {
+  try {
+    const totalEmployees = await Employee.countDocuments(); // ✅ total row count
+
+    const nextId = totalEmployees + 1; // ✅ total + 1
+    const empCode = `DHEMP${nextId}`;
+
+    res.status(200).json({ empCode });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   addemployee,
   updateStatus,
@@ -218,4 +237,5 @@ module.exports = {
   deleteemployee,
   getemployeeByid,
   categoryOptions,
+  generateEmployeeCode,
 };

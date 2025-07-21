@@ -132,7 +132,6 @@ const updateemployee = async (req, res) => {
     const { emp_id,name, email, role } = req.body;
     const url = createCleanUrl(req.body.name);
     const id = req.params.id;
-
     const userExist = await Employee.findOne({ email, _id: { $ne: id } });
 
     if (userExist) {

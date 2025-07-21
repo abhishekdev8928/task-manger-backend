@@ -30,6 +30,6 @@ const storage = multer.diskStorage({
   })
 
 router.route("/editbyid/:id").get(profilecontrollers.getdatabyid);
-router.patch("/editprofile/:id",upload.single('pic'), profilecontrollers.updateprofile);
+router.patch("/editprofile/:id",upload.single('profile_pic'), profilecontrollers.updateprofile);
 
 module.exports = router;

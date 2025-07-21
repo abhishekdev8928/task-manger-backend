@@ -8,8 +8,8 @@ const employeeSchema = new Schema({
   role: { type: String, required: true },
   password: { type: String, required: true },
   phone: { type: String },
-    emp_id: { type: String },
-
+  emp_id: { type: String },
+  profile_pic: { type: String },
   url: { type: String },
   status: { type: String },
   createdAt: { type: String },
@@ -18,7 +18,7 @@ const employeeSchema = new Schema({
   tokenExpire: { type: Date }, // ✅ Use Date type
   authkey: { type: String }, // ✅ If you're storing base32 secret
   otp: { type: String },
-  loginotpcount: { type: Number, default: 0 }
+  loginotpcount: { type: Number, default: 0 },
 });
 
 // employeeSchema.pre('save', async function (next) {
@@ -35,8 +35,7 @@ const employeeSchema = new Schema({
 // });
 
 employeeSchema.methods.comparePassword = async function (password) {
-    return password === this.password; // Plain-text comparison
-
+  return password === this.password; // Plain-text comparison
 };
 
 employeeSchema.methods.generateToken = async function () {

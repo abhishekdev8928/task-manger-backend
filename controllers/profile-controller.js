@@ -1,36 +1,59 @@
-const User = require("../models/user-model");
 const bcrypt = require("bcryptjs");
-const updateprofile = async (req,res)=>{
-    try {
-        console.log(req.body);
-    
-         const id = req.params.id;
-        
-        const updateData = req.body;
-        const email = updateData.email;
-        const userExist = await User.findOne({ email, _id: { $ne: id }});
-        
-        const saltRound = await bcrypt.genSalt(10);
-        updateData.password = await bcrypt.hash(updateData.password, saltRound);
-        if(userExist){
-            return res.status(400).json({msg:"Email id already exist"});
 
-        }
+const { Employee } = require("../models/employee-model");
 
-        if (req.file) {
-            updateData.pic = req.file.filename; 
-        }
 
-        const updatedProfile = await User.findByIdAndUpdate(id, updateData, { new: true });
+function createCleanUrl(title) {
+  // Convert the title to lowercase
+  let cleanTitle = title.toLowerCase();
+  // Remove special characters, replace spaces with dashes
+  cleanTitle = cleanTitle.replace(/[^\w\s-]/g, "");
+  cleanTitle = cleanTitle.replace(/\s+/g, "-");
 
-        res.status(201).json({
-            msg:'Updated Successfully',
-        });
+  return cleanTitle;
+}
+const updateprofile = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updateData = req.body;
 
-    } catch (error) {
-        console.error("Error in updateprofile:", error.message); // Log the error message
-        res.status(500).json({ error: "Internal Server Error", details: error.message }); // Send the error message in the response
+    // ✅ Generate clean URL from name
+    const url = createCleanUrl(updateData.name);
+    updateData.url = url; // Optional: store in DB if needed
+
+    // ✅ Check if email already exists for another user
+    const email = updateData.email;
+    const userExist = await Employee.findOne({ email, _id: { $ne: id } });
+
+    if (userExist) {
+      return res.status(400).json({ msg: "Email ID already exists" });
     }
+
+    // ✅ Handle profile pic
+    if (req.file) {
+      updateData.profile_pic = req.file.filename;
+    }
+
+    // ✅ Update user
+    const updatedProfile = await Employee.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+
+    if (!updatedProfile) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    res.status(200).json({
+      msg: "Updated Successfully",
+      user: updatedProfile,
+    });
+  } catch (error) {
+    console.error("Error in updateprofile:", error.message);
+    res.status(500).json({
+      error: "Internal Server Error",
+      details: error.message,
+    });
+  }
 };
 const getdatabyid = async(req, res) => {
     try {

@@ -55,6 +55,37 @@ const updateprofile = async (req, res) => {
     });
   }
 };
+
+
+const updatepassword = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { current_password, new_password } = req.body;
+
+    const user = await Employee.findById(id);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    // Compare plain text password
+    if (user.password !== current_password) {
+      return res.status(400).json({ msg: "wrong_password" });
+    }
+
+    // Update password
+    user.password = new_password;
+
+    // Save without touching __v
+    await user.save();
+
+    res.status(200).json({ msg: "Password updated successfully" });
+  } catch (error) {
+    console.error("Error in updatepassword:", error.message);
+    res.status(500).json({ msg: "Internal Server Error", error: error.message });
+  }
+};
+
+
 const getdatabyid = async(req, res) => {
     try {
         const id = req.params.id;
@@ -69,4 +100,4 @@ const getdatabyid = async(req, res) => {
     }
 };
 
-module.exports = { updateprofile , getdatabyid};
+module.exports = { updateprofile , getdatabyid,updatepassword};

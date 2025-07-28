@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-const URI = "mongodb+srv://abhisheksharma:2hUsnH6khUfPSHDj@task-manager.ppwbavp.mongodb.net/task-manager";
-// const URI = "mongodb+srv://digihost2021:E1IBiNmZzhWtKDyB@cluster0.c1qye.mongodb.net/test";
+// const URI = "mongodb+srv://abhisheksharma:2hUsnH6khUfPSHDj@task-manager.ppwbavp.mongodb.net/task-manager";
+const URI = "mongodb://127.0.0.1:27017/task-manager";
 // mongoose.connect(URI);
 
 const connectDB = async () => {
